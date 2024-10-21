@@ -23,10 +23,13 @@ clean :
 		reloader/build-$(BOARD) reloader/src/boards/$(BOARD)/bootloader.h \
 		micropython/mpy-cross/build \
 		micropython/ports/nrf/build-$(BOARD)-s132 \
+		apps/*.mpy \
+		build-$(BOARD) \
 		wasp/boards/$(BOARD)/watch.py \
 		wasp/apps/user \
 		wasp/boards/manifest_user_apps.py \
 		wasp/appregistry.py
+	find . -type f -name '*.py[co]' -delete -o -type d -name __pycache__ -delete
 
 # Avoid a recursive update... it grabs far too much
 submodules :
@@ -62,7 +65,13 @@ wasp/boards/$(BOARD_SAFE)/watch.py : wasp/boards/$(BOARD_SAFE)/watch.py.in
 		|| ($(RM) wasp/boards/$(BOARD)/watch.py; false)
 
 micropython/mpy-cross/mpy-cross:
-	$(MAKE) -C micropython/mpy-cross
+	$(MAKE) -C micropython/mpy-cross \
+		CWARN="-Wall -Wno-error"
+		# ^ Disable some Werrors from GCC>=13, specifically
+		#     - dangling-pointer
+		#     - enum-int-mismatch
+		#   TODO update micropython and remove.
+		#   https://github.com/wasp-os/wasp-os/issues/493
 
 micropython: build-$(BOARD_SAFE) wasp/boards/manifest_user_apps.py wasp/boards/$(BOARD_SAFE)/watch.py micropython/mpy-cross/mpy-cross
 	$(RM) micropython/ports/nrf/build-$(BOARD)-s132/frozen_content.c
@@ -70,7 +79,13 @@ micropython: build-$(BOARD_SAFE) wasp/boards/manifest_user_apps.py wasp/boards/$
 		BOARD=$(BOARD) SD=s132 \
 		MICROPY_VFS_LFS2=1 \
 		FROZEN_MANIFEST=$(CURDIR)/wasp/boards/$(BOARD)/manifest.py \
-		USER_C_MODULES=$(CURDIR)/wasp/modules
+		USER_C_MODULES=$(CURDIR)/wasp/modules \
+		COPT="-Wno-error"
+		# ^ Disable some Werrors from GCC>=13, specifically
+		#     - dangling-pointer
+		#     - enum-int-mismatch
+		#   TODO update micropython and remove.
+		#   https://github.com/wasp-os/wasp-os/issues/493
 	$(PYTHON) -m nordicsemi dfu genpkg \
 		--dev-type 0x0052 \
 		--application micropython/ports/nrf/build-$(BOARD)-s132/firmware.hex \
